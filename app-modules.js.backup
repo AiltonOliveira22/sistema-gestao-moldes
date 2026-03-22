@@ -1,0 +1,1894 @@
+// Continuação dos métodos do AppManager
+
+// Itens Críticos
+AppManager.prototype.showItemCriticoForm = function(item = null) {
+    const content = `
+        <form id="itemCriticoForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Código *</label>
+                    <input type="text" name="codigo" value="${item && item.codigo || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Descrição *</label>
+                    <input type="text" name="descricao" value="${item && item.descricao || ''}" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Quantidade *</label>
+                    <input type="number" name="quantidade" value="${item && item.quantidade || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Unidade *</label>
+                    <select name="unidade" required>
+                        <option value="UN" ${item && item.unidade === 'UN' ? 'selected' : ''}>UN</option>
+                        <option value="KG" ${item && item.unidade === 'KG' ? 'selected' : ''}>KG</option>
+                        <option value="L" ${item && item.unidade === 'L' ? 'selected' : ''}>L</option>
+                        <option value="M" ${item && item.unidade === 'M' ? 'selected' : ''}>M</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Estoque Mínimo *</label>
+                    <input type="number" name="estoqueMinimo" value="${item && item.estoqueMinimo || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Consumo Mensal</label>
+                    <input type="number" name="consumoMensal" value="${item && item.consumoMensal || ''}" placeholder="Opcional">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Localização *</label>
+                <input type="text" name="localizacao" value="${item && item.localizacao || ''}" required>
+            </div>
+        </form>
+    `;
+
+    this.modal.show(item ? 'Editar Item' : 'Adicionar Item', content, () => {
+        const form = document.getElementById('itemCriticoForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return false;
+        }
+
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        data.quantidade = parseInt(data.quantidade);
+        data.estoqueMinimo = parseInt(data.estoqueMinimo);
+        data.consumoMensal = data.consumoMensal ? parseInt(data.consumoMensal) : null;
+
+        if (item) {
+            this.storage.updateItem('itensCriticos', item.id, data);
+            this.notification.show('success', 'Sucesso', 'Item atualizado com sucesso!');
+        } else {
+            this.storage.addItem('itensCriticos', data);
+            this.notification.show('success', 'Sucesso', 'Item adicionado com sucesso!');
+        }
+
+        this.renderItensCriticos();
+        this.updateDashboard();
+        return true;
+    });
+};
+
+AppManager.prototype.renderItensCriticos = function() {
+    const items = this.storage.getModule('itensCriticos');
+    const tbody = document.getElementById('itensCriticosTable');
+
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-message">Nenhum item cadastrado</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(item => {
+        const status = item.quantidade <= item.estoqueMinimo ? 'Crítico' : 
+                      item.quantidade <= item.estoqueMinimo * 1.5 ? 'Baixo' : 'Normal';
+        const statusClass = status === 'Normal' ? 'success' : status === 'Baixo' ? 'warning' : 'danger';
+        
+        return `
+            <tr>
+                <td><strong>${item.codigo}</strong></td>
+                <td>${item.descricao}</td>
+                <td>${item.quantidade}</td>
+                <td>${item.unidade}</td>
+                <td>${item.estoqueMinimo}</td>
+                <td>${item.consumoMensal || '-'}</td>
+                <td>${item.localizacao}</td>
+                <td><span class="badge badge-${statusClass}">${status}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="window.app.editItemCritico('${item.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="window.app.deleteItemCritico('${item.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+};
+
+AppManager.prototype.deleteItemCritico = function(id) {
+    if (confirm('Tem certeza que deseja excluir este item?')) {
+        this.storage.deleteItem('itensCriticos', id);
+        this.notification.show('success', 'Sucesso', 'Item excluído com sucesso!');
+        this.renderItensCriticos();
+        this.updateDashboard();
+    }
+};
+
+// Funcionários
+// QLP
+AppManager.prototype.showQlpForm = function(item = null) {
+    const content = `
+        <form id="qlpForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Matrícula *</label>
+                    <input type="text" name="matricula" value="${item && item.matricula || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Nome *</label>
+                    <input type="text" name="nome" value="${item && item.nome || ''}" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Função *</label>
+                    <input type="text" name="funcao" value="${item && item.funcao || ''}" required placeholder="Ex: Técnico, Coordenador">
+                </div>
+                <div class="form-group">
+                    <label>Data de Entrada *</label>
+                    <input type="date" name="dataEntrada" value="${item && item.dataEntrada || ''}" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Rua</label>
+                    <input type="text" name="rua" value="${item && item.rua || ''}" placeholder="Ex: Rua das Flores">
+                </div>
+                <div class="form-group">
+                    <label>Número</label>
+                    <input type="text" name="numero" value="${item && item.numero || ''}" placeholder="Ex: 123">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Bairro</label>
+                    <input type="text" name="bairro" value="${item && item.bairro || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Cidade</label>
+                    <input type="text" name="cidade" value="${item && item.cidade || ''}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Escolaridade *</label>
+                    <select name="escolaridade" required>
+                        <option value="">Selecione...</option>
+                        <option value="Ensino Médio" ${item && item.escolaridade === 'Ensino Médio' ? 'selected' : ''}>Ensino Médio</option>
+                        <option value="Técnico" ${item && item.escolaridade === 'Técnico' ? 'selected' : ''}>Técnico</option>
+                        <option value="Graduação" ${item && item.escolaridade === 'Graduação' ? 'selected' : ''}>Graduação</option>
+                        <option value="Pós" ${item && item.escolaridade === 'Pós' ? 'selected' : ''}>Pós</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status *</label>
+                    <select name="status" required>
+                        <option value="Ativo" ${item && item.status === 'Ativo' ? 'selected' : ''}>Ativo</option>
+                        <option value="Férias" ${item && item.status === 'Férias' ? 'selected' : ''}>Férias</option>
+                        <option value="Afastado" ${item && item.status === 'Afastado' ? 'selected' : ''}>Afastado</option>
+                        <option value="Inativo" ${item && item.status === 'Inativo' ? 'selected' : ''}>Inativo</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Informações</label>
+                <textarea name="informacoes" rows="3" placeholder="Informações adicionais...">${item && item.informacoes || ''}</textarea>
+            </div>
+            <div style="background: #eff6ff; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                <strong style="color: #2563eb;">ℹ️ Tempo de Empresa será calculado automaticamente</strong>
+                <p style="margin: 5px 0 0 0; color: #475569;">Baseado na Data de Entrada até a data atual</p>
+            </div>
+        </form>
+    `;
+
+    this.modal.show(item ? 'Editar QLP' : 'Adicionar QLP', content, () => {
+        const form = document.getElementById('qlpForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return false;
+        }
+
+        const formData = new FormData(form);
+        const data = {
+            matricula: formData.get('matricula'),
+            nome: formData.get('nome'),
+            funcao: formData.get('funcao'),
+            dataEntrada: formData.get('dataEntrada'),
+            rua: formData.get('rua'),
+            numero: formData.get('numero'),
+            bairro: formData.get('bairro'),
+            cidade: formData.get('cidade'),
+            escolaridade: formData.get('escolaridade'),
+            informacoes: formData.get('informacoes'),
+            status: formData.get('status')
+        };
+
+        if (item) {
+            this.storage.updateItem('qlp', item.id, data);
+            this.notification.show('success', 'Sucesso', 'QLP atualizado com sucesso!');
+        } else {
+            this.storage.addItem('qlp', data);
+            this.notification.show('success', 'Sucesso', 'QLP adicionado com sucesso!');
+        }
+
+        this.renderQlp();
+        this.updateDashboard();
+        return true;
+    });
+};
+
+AppManager.prototype.renderQlp = function() {
+    const items = this.storage.getModule('qlp');
+    const tbody = document.getElementById('qlpTable');
+
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="13" class="empty-message">Nenhum QLP cadastrado</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(item => {
+        const statusClass = item.status === 'Ativo' ? 'success' : item.status === 'Férias' ? 'info' : 'warning';
+        
+        // Calcular Tempo de Empresa
+        const tempoEmpresa = item.dataEntrada ? this.calculos.calcularTempoEmpresa(item.dataEntrada) : '-';
+        
+        return `
+            <tr>
+                <td><strong>${item.matricula}</strong></td>
+                <td>${item.nome}</td>
+                <td>${item.funcao}</td>
+                <td>${item.dataEntrada ? this.formatDate(item.dataEntrada) : '-'}</td>
+                <td>${tempoEmpresa}</td>
+                <td>${item.rua || '-'}</td>
+                <td>${item.numero || '-'}</td>
+                <td>${item.bairro || '-'}</td>
+                <td>${item.cidade || '-'}</td>
+                <td><span class="badge badge-info">${item.escolaridade || '-'}</span></td>
+                <td>${item.informacoes || '-'}</td>
+                <td><span class="badge badge-${statusClass}">${item.status}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="window.app.editQlp('${item.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="window.app.deleteQlp('${item.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+};
+
+AppManager.prototype.deleteQlp = function(id) {
+    if (confirm('Tem certeza que deseja excluir este QLP?')) {
+        this.storage.deleteItem('qlp', id);
+        this.notification.show('success', 'Sucesso', 'QLP excluído com sucesso!');
+        this.renderQlp();
+        this.updateDashboard();
+    }
+};
+
+AppManager.prototype.editQlp = function(id) {
+    const items = this.storage.getModule('qlp');
+    const item = items.find(i => i.id === id);
+    if (item) this.showQlpForm(item);
+};
+
+// Gases (Cilindros)
+AppManager.prototype.showGasForm = function(item = null) {
+    const content = `
+        <form id="gasForm">
+            <div class="form-group">
+                <label>Tipo de Gás *</label>
+                <select name="tipoGas" required>
+                    <option value="OXIGÊNIO" ${item && item.tipoGas === 'OXIGÊNIO' ? 'selected' : ''}>OXIGÊNIO</option>
+                    <option value="ACETILENO" ${item && item.tipoGas === 'ACETILENO' ? 'selected' : ''}>ACETILENO</option>
+                    <option value="ARGÔNIO" ${item && item.tipoGas === 'ARGÔNIO' ? 'selected' : ''}>ARGÔNIO</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Data Pedido *</label>
+                    <input type="date" name="dataPedido" value="${item && item.dataPedido || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Data Montagem *</label>
+                    <input type="date" name="dataMontagem" value="${item && item.dataMontagem || ''}" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Data Saída *</label>
+                    <input type="date" name="dataSaida" value="${item && item.dataSaida || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Responsável *</label>
+                    <input type="text" name="responsavel" value="${item && item.responsavel || ''}" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Status *</label>
+                <select name="status" required>
+                    <option value="Reserva" ${item && item.status === 'Reserva' ? 'selected' : ''}>Reserva</option>
+                    <option value="Montado" ${item && item.status === 'Montado' ? 'selected' : ''}>Montado</option>
+                    <option value="Encerrado" ${item && item.status === 'Encerrado' ? 'selected' : ''}>Encerrado</option>
+                </select>
+            </div>
+            <div style="background: #eff6ff; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                <strong style="color: #2563eb;">ℹ️ Duração será calculada automaticamente</strong>
+                <p style="margin: 5px 0 0 0; color: #475569;">Duração = Data Saída - Data Montagem</p>
+            </div>
+        </form>
+    `;
+
+    this.modal.show(item ? 'Editar Registro' : 'Registrar Cilindro', content, () => {
+        const form = document.getElementById('gasForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return false;
+        }
+
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+
+        if (item) {
+            this.storage.updateItem('gases', item.id, data);
+            this.notification.show('success', 'Sucesso', 'Registro atualizado com sucesso!');
+        } else {
+            this.storage.addItem('gases', data);
+            this.notification.show('success', 'Sucesso', 'Cilindro registrado com sucesso!');
+        }
+
+        this.renderGases();
+        this.updateDashboard();
+        return true;
+    });
+};
+
+AppManager.prototype.renderGases = function() {
+    const items = this.storage.getModule('gases');
+    const tbody = document.getElementById('gasesTable');
+
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-message">Nenhum registro de cilindro</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(item => {
+        const duracao = CalculosMoldes.calcularDuracaoGas(item.dataMontagem, item.dataSaida);
+        
+        // Definir cor do badge conforme status
+        const statusClass = item.status === 'Montado' ? 'success' : 
+                           item.status === 'Reserva' ? 'warning' : 'danger';
+        
+        return `
+            <tr>
+                <td><strong>${item.tipoGas}</strong></td>
+                <td>${this.formatDate(item.dataPedido)}</td>
+                <td>${this.formatDate(item.dataMontagem)}</td>
+                <td>${this.formatDate(item.dataSaida)}</td>
+                <td><span class="badge badge-info">${duracao} dias</span></td>
+                <td>${item.responsavel}</td>
+                <td><span class="badge badge-${statusClass}">${item.status || 'Montado'}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="window.app.editGas('${item.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="window.app.deleteGas('${item.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+};
+
+AppManager.prototype.deleteGas = function(id) {
+    if (confirm('Tem certeza que deseja excluir este registro?')) {
+        this.storage.deleteItem('gases', id);
+        this.notification.show('success', 'Sucesso', 'Registro excluído com sucesso!');
+        this.renderGases();
+        this.updateDashboard();
+    }
+};
+
+// Treinamentos
+AppManager.prototype.showTreinamentoForm = function(item = null) {
+    const content = `
+        <form id="treinamentoForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Data *</label>
+                    <input type="date" name="data" value="${item && item.data || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Tipo *</label>
+                    <select name="tipo" required>
+                        <option value="Técnico" ${item && item.tipo === 'Técnico' ? 'selected' : ''}>Técnico</option>
+                        <option value="Segurança" ${item && item.tipo === 'Segurança' ? 'selected' : ''}>Segurança</option>
+                        <option value="Qualidade" ${item && item.tipo === 'Qualidade' ? 'selected' : ''}>Qualidade</option>
+                        <option value="Operacional" ${item && item.tipo === 'Operacional' ? 'selected' : ''}>Operacional</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Título *</label>
+                <input type="text" name="titulo" value="${item && item.titulo || ''}" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Instrutor *</label>
+                    <input type="text" name="instrutor" value="${item && item.instrutor || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Nº de Participantes *</label>
+                    <input type="number" name="participantes" value="${item && item.participantes || ''}" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Status *</label>
+                <select name="status" required>
+                    <option value="Agendado" ${item && item.status === 'Agendado' ? 'selected' : ''}>Agendado</option>
+                    <option value="Em Andamento" ${item && item.status === 'Em Andamento' ? 'selected' : ''}>Em Andamento</option>
+                    <option value="Concluído" ${item && item.status === 'Concluído' ? 'selected' : ''}>Concluído</option>
+                    <option value="Cancelado" ${item && item.status === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
+                </select>
+            </div>
+        </form>
+    `;
+
+    this.modal.show(item ? 'Editar Treinamento' : 'Agendar Treinamento', content, () => {
+        const form = document.getElementById('treinamentoForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return false;
+        }
+
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        data.participantes = parseInt(data.participantes);
+
+        if (item) {
+            this.storage.updateItem('treinamentos', item.id, data);
+            this.notification.show('success', 'Sucesso', 'Treinamento atualizado com sucesso!');
+        } else {
+            this.storage.addItem('treinamentos', data);
+            this.notification.show('success', 'Sucesso', 'Treinamento agendado com sucesso!');
+        }
+
+        this.renderTreinamentos();
+        this.updateDashboard();
+        return true;
+    });
+};
+
+AppManager.prototype.renderTreinamentos = function() {
+    const items = this.storage.getModule('treinamentos');
+    const tbody = document.getElementById('treinamentosTable');
+
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-message">Nenhum treinamento agendado</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(item => {
+        const statusClass = item.status === 'Concluído' ? 'success' : 
+                           item.status === 'Em Andamento' ? 'info' : 
+                           item.status === 'Cancelado' ? 'danger' : 'warning';
+        
+        return `
+            <tr>
+                <td>${this.formatDate(item.data)}</td>
+                <td><strong>${item.titulo}</strong></td>
+                <td>${item.tipo}</td>
+                <td>${item.instrutor}</td>
+                <td>${item.participantes}</td>
+                <td><span class="badge badge-${statusClass}">${item.status}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="window.app.editTreinamento('${item.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="window.app.deleteTreinamento('${item.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+};
+
+AppManager.prototype.deleteTreinamento = function(id) {
+    if (confirm('Tem certeza que deseja excluir este treinamento?')) {
+        this.storage.deleteItem('treinamentos', id);
+        this.notification.show('success', 'Sucesso', 'Treinamento excluído com sucesso!');
+        this.renderTreinamentos();
+        this.updateDashboard();
+    }
+};
+
+// Reuniões
+AppManager.prototype.showReuniaoForm = function(item = null) {
+    const content = `
+        <form id="reuniaoForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Data *</label>
+                    <input type="date" name="data" value="${item && item.data || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Tipo *</label>
+                    <select name="tipo" required>
+                        <option value="DDS" ${item && item.tipo === 'DDS' ? 'selected' : ''}>DDS</option>
+                        <option value="Produção" ${item && item.tipo === 'Produção' ? 'selected' : ''}>Produção</option>
+                        <option value="Qualidade" ${item && item.tipo === 'Qualidade' ? 'selected' : ''}>Qualidade</option>
+                        <option value="Manutenção" ${item && item.tipo === 'Manutenção' ? 'selected' : ''}>Manutenção</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Participantes *</label>
+                <input type="number" name="participantes" value="${item && item.participantes || ''}" required min="0">
+            </div>
+            
+            <div class="form-section">
+                <h3 style="margin-top: 15px; color: #e74c3c;">🚨 Segurança</h3>
+                <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+                    <div class="form-group">
+                        <label>Condição Insegura</label>
+                        <input type="number" name="condicaoInsegura" value="${item && item.condicaoInsegura || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Incidente</label>
+                        <input type="number" name="incidente" value="${item && item.incidente || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Ato Inseguro</label>
+                        <input type="number" name="atoInseguro" value="${item && item.atoInseguro || 0}" min="0">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3 style="margin-top: 15px; color: #3498db;">🏭 Produção</h3>
+                <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+                    <div class="form-group">
+                        <label>Moldes Recebidos</label>
+                        <input type="number" name="moldesRecebidos" value="${item && item.moldesRecebidos || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Peças Limpas</label>
+                        <input type="number" name="pecasLimpas" value="${item && item.pecasLimpas || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Moldes Reparados</label>
+                        <input type="number" name="moldesReparados" value="${item && item.moldesReparados || 0}" min="0">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3 style="margin-top: 15px; color: #27ae60;">🔧 Componentes - Coroas</h3>
+                <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+                    <div class="form-group">
+                        <label>Coroas Recebidas</label>
+                        <input type="number" name="coroasRecebidas" value="${item && item.coroasRecebidas || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Coroas Reparadas</label>
+                        <input type="number" name="coroasReparadas" value="${item && item.coroasReparadas || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Coroas Inspecionadas</label>
+                        <input type="number" name="coroasInspecionadas" value="${item && item.coroasInspecionadas || 0}" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Coroas Segregadas</label>
+                    <input type="number" name="coroasSegregadas" value="${item && item.coroasSegregadas || 0}" min="0">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3 style="margin-top: 15px; color: #e67e22;">⚙️ Componentes - Punções</h3>
+                <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+                    <div class="form-group">
+                        <label>Punções Recebidos</label>
+                        <input type="number" name="puncoesRecebidos" value="${item && item.puncoesRecebidos || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Punções Reparados</label>
+                        <input type="number" name="puncoesReparados" value="${item && item.puncoesReparados || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Punções Segregados</label>
+                        <input type="number" name="puncoesSegregados" value="${item && item.puncoesSegregados || 0}" min="0">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3 style="margin-top: 15px; color: #9b59b6;">📊 Inspeção e Volume</h3>
+                <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+                    <div class="form-group">
+                        <label>Volume Inspecionado</label>
+                        <input type="number" name="volumeInspecionado" value="${item && item.volumeInspecionado || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Volume Segregado</label>
+                        <input type="number" name="volumeSegregado" value="${item && item.volumeSegregado || 0}" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Insertos Segregados</label>
+                    <input type="number" name="insertosSegregados" value="${item && item.insertosSegregados || 0}" min="0">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Tópicos Discutidos</label>
+                <textarea name="topicos" rows="3" placeholder="Opcional">${item && item.topicos || ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Ações Definidas</label>
+                <textarea name="acoes" rows="3" placeholder="Opcional">${item && item.acoes || ''}</textarea>
+            </div>
+        </form>
+    `;
+
+    this.modal.show(item ? 'Editar Reunião' : 'Nova Reunião', content, () => {
+        const form = document.getElementById('reuniaoForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return false;
+        }
+
+        const formData = new FormData(form);
+        const data = {
+            data: formData.get('data'),
+            tipo: formData.get('tipo'),
+            participantes: parseInt(formData.get('participantes')),
+            condicaoInsegura: parseInt(formData.get('condicaoInsegura')) || 0,
+            incidente: parseInt(formData.get('incidente')) || 0,
+            atoInseguro: parseInt(formData.get('atoInseguro')) || 0,
+            moldesRecebidos: parseInt(formData.get('moldesRecebidos')) || 0,
+            pecasLimpas: parseInt(formData.get('pecasLimpas')) || 0,
+            moldesReparados: parseInt(formData.get('moldesReparados')) || 0,
+            coroasRecebidas: parseInt(formData.get('coroasRecebidas')) || 0,
+            coroasReparadas: parseInt(formData.get('coroasReparadas')) || 0,
+            coroasInspecionadas: parseInt(formData.get('coroasInspecionadas')) || 0,
+            coroasSegregadas: parseInt(formData.get('coroasSegregadas')) || 0,
+            puncoesRecebidos: parseInt(formData.get('puncoesRecebidos')) || 0,
+            puncoesReparados: parseInt(formData.get('puncoesReparados')) || 0,
+            puncoesSegregados: parseInt(formData.get('puncoesSegregados')) || 0,
+            volumeInspecionado: parseInt(formData.get('volumeInspecionado')) || 0,
+            volumeSegregado: parseInt(formData.get('volumeSegregado')) || 0,
+            insertosSegregados: parseInt(formData.get('insertosSegregados')) || 0,
+            topicos: formData.get('topicos'),
+            acoes: formData.get('acoes')
+        };
+
+        if (item) {
+            this.storage.updateItem('reunioes', item.id, data);
+            this.notification.show('success', 'Sucesso', 'Reunião atualizada com sucesso!');
+        } else {
+            this.storage.addItem('reunioes', data);
+            this.notification.show('success', 'Sucesso', 'Reunião registrada com sucesso!');
+        }
+
+        this.renderReunioes();
+        this.updateDashboard();
+        return true;
+    });
+};
+
+AppManager.prototype.renderReunioes = function() {
+    const items = this.storage.getModule('reunioes');
+    const tbody = document.getElementById('reunioesTable');
+
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-message">Nenhuma reunião registrada</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(item => {
+        // Calcular resumo detalhado
+        const segurancaTotal = (item.condicaoInsegura || 0) + (item.incidente || 0) + (item.atoInseguro || 0);
+        const producaoTotal = (item.moldesRecebidos || 0) + (item.pecasLimpas || 0) + (item.moldesReparados || 0);
+        const componentesTotal = (item.coroasRecebidas || 0) + (item.coroasReparadas || 0) + (item.coroasInspecionadas || 0) + 
+                                 (item.puncoesRecebidos || 0) + (item.puncoesReparados || 0);
+        const volumeTotal = (item.volumeInspecionado || 0) + (item.volumeSegregado || 0);
+        const taxaRejeicao = item.volumeInspecionado > 0 ? ((item.volumeSegregado / item.volumeInspecionado) * 100).toFixed(1) : 0;
+        
+        // Criar resumo visual compacto
+        const resumoDetalhado = `
+<div style="font-size: 12px; line-height: 1.8; color: var(--text-secondary);">
+    <div style="margin-bottom: 4px;">
+        <strong style="color: var(--danger-color);">⚠️ Segurança:</strong> ${segurancaTotal} 
+        <span style="font-size: 11px;">(CI:${item.condicaoInsegura || 0} | I:${item.incidente || 0} | AI:${item.atoInseguro || 0})</span>
+    </div>
+    <div style="margin-bottom: 4px;">
+        <strong style="color: var(--success-color);">🏭 Produção:</strong> ${producaoTotal}
+        <span style="font-size: 11px;">(Rec:${item.moldesRecebidos || 0} | Limp:${item.pecasLimpas || 0} | Rep:${item.moldesReparados || 0})</span>
+    </div>
+    <div style="margin-bottom: 4px;">
+        <strong style="color: var(--warning-color);">⚙️ Componentes:</strong> ${componentesTotal}
+        <span style="font-size: 11px;">(Coroas:${(item.coroasRecebidas || 0) + (item.coroasReparadas || 0)} | Punções:${(item.puncoesRecebidos || 0) + (item.puncoesReparados || 0)})</span>
+    </div>
+    <div>
+        <strong style="color: var(--primary-color);">📊 Volume:</strong> ${volumeTotal.toLocaleString('pt-BR')}
+        <span style="font-size: 11px;">(Insp:${(item.volumeInspecionado || 0).toLocaleString('pt-BR')} | Seg:${(item.volumeSegregado || 0).toLocaleString('pt-BR')} | Taxa:${taxaRejeicao}%)</span>
+    </div>
+</div>`;
+        
+        return `
+            <tr>
+                <td>${this.formatDate(item.data)}</td>
+                <td><strong>${item.tipo}</strong></td>
+                <td style="text-align: center;"><strong>${item.participantes}</strong></td>
+                <td>
+                    ${resumoDetalhado}
+                    <details style="margin-top: 8px;">
+                        <summary style="cursor: pointer; color: var(--primary-color); font-size: 11px;">Ver Tópicos/Ações</summary>
+                        <div style="margin-top: 8px; padding: 8px; background: var(--bg-light); border-radius: 4px; font-size: 12px;">
+                            <strong>Tópicos:</strong><br>${item.topicos || 'N/A'}<br><br>
+                            <strong>Ações:</strong><br>${item.acoes || 'N/A'}
+                        </div>
+                    </details>
+                </td>
+                <td style="white-space: nowrap;">
+                    <button class="btn btn-sm btn-primary" onclick="window.app.editReuniao('${item.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="window.app.deleteReuniao('${item.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+};
+
+AppManager.prototype.deleteReuniao = function(id) {
+    if (confirm('Tem certeza que deseja excluir esta reunião?')) {
+        this.storage.deleteItem('reunioes', id);
+        this.notification.show('success', 'Sucesso', 'Reunião excluída com sucesso!');
+        this.renderReunioes();
+        this.updateDashboard();
+    }
+};
+
+// Helper methods para edição por ID
+AppManager.prototype.editItemCritico = function(id) {
+    const items = this.storage.getModule('itensCriticos');
+    const item = items.find(i => i.id === id);
+    if (item) this.showItemCriticoForm(item);
+};
+
+
+AppManager.prototype.editGas = function(id) {
+    const items = this.storage.getModule('gases');
+    const item = items.find(i => i.id === id);
+    if (item) this.showGasForm(item);
+};
+
+AppManager.prototype.editTreinamento = function(id) {
+    const items = this.storage.getModule('treinamentos');
+    const item = items.find(i => i.id === id);
+    if (item) this.showTreinamentoForm(item);
+};
+
+AppManager.prototype.editReuniao = function(id) {
+    const items = this.storage.getModule('reunioes');
+    const item = items.find(i => i.id === id);
+    if (item) this.showReuniaoForm(item);
+};
+
+// Custos
+AppManager.prototype.showCustoForm = function(item = null) {
+    const content = `
+        <form id="custoForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>SKU *</label>
+                    <input type="text" name="sku" value="${item && item.sku || ''}" required placeholder="Ex: Stella">
+                </div>
+                <div class="form-group">
+                    <label>Item (Número) *</label>
+                    <input type="number" name="item" value="${item && item.item || ''}" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Tipo de Molde *</label>
+                <input type="text" name="tipoMolde" value="${item && item.tipoMolde || ''}" required placeholder="Ex: BLOW MOULD">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tradução *</label>
+                    <input type="text" name="traducao" value="${item && item.traducao || ''}" required placeholder="Ex: MOLDE">
+                </div>
+                <div class="form-group">
+                    <label>Classificação *</label>
+                    <select name="classificacao" required>
+                        <option value="">Selecione...</option>
+                        <option value="MOULD" ${item && item.classificacao === 'MOULD' ? 'selected' : ''}>MOULD (Molde)</option>
+                        <option value="ACESSÓRIO" ${item && item.classificacao === 'ACESSÓRIO' ? 'selected' : ''}>ACESSÓRIO</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Fornecedor *</label>
+                <input type="text" name="fornecedor" value="${item && item.fornecedor || ''}" required placeholder="Ex: Fornecedor ABC">
+            </div>
+            <div class="form-group">
+                <label>Quantidade *</label>
+                <input type="number" name="quantidade" value="${item && item.quantidade || ''}" required min="1">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Moeda *</label>
+                    <select name="moeda" required>
+                        <option value="EUR" ${!item || item.moeda === 'EUR' ? 'selected' : ''}>€ Euro</option>
+                        <option value="USD" ${item && item.moeda === 'USD' ? 'selected' : ''}>$ Dólar</option>
+                        <option value="BRL" ${item && item.moeda === 'BRL' ? 'selected' : ''}>R$ Real</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Valor Unitário *</label>
+                    <input type="number" name="valorUnitario" value="${item && item.valorUnitario || ''}" required min="0" step="0.01" placeholder="0.00">
+                </div>
+            </div>
+            <div style="background: #eff6ff; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                <strong style="color: #2563eb;">ℹ️ Cálculo Automático</strong>
+                <p style="margin: 5px 0 0 0; color: #475569;">O Valor Total será calculado automaticamente: Quantidade × Valor Unitário</p>
+            </div>
+        </form>
+    `;
+
+    this.modal.show(item ? 'Editar Item de Custo' : 'Adicionar Item de Custo', content, () => {
+        const form = document.getElementById('custoForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return false;
+        }
+
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        // Converter números
+        data.item = parseInt(data.item);
+        data.quantidade = parseInt(data.quantidade);
+        data.valorUnitario = parseFloat(data.valorUnitario);
+        data.valorTotal = data.quantidade * data.valorUnitario;
+
+        if (item) {
+            this.storage.updateItem('custos', item.id, data);
+            this.notification.show('success', 'Sucesso', 'Item atualizado com sucesso!');
+        } else {
+            this.storage.addItem('custos', data);
+            this.notification.show('success', 'Sucesso', 'Item adicionado com sucesso!');
+        }
+
+        this.renderCustos();
+        return true;
+    });
+};
+
+AppManager.prototype.renderCustos = function() {
+    const items = this.storage.getModule('custos');
+    const tbody = document.getElementById('custosTable');
+    
+    // Renderizar tabela
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-message">Nenhum item cadastrado</td></tr>';
+        this.updateCustosStats(items);
+        return;
+    }
+
+    tbody.innerHTML = items.map(item => {
+        const classificacaoBadge = item.classificacao === 'MOULD' ? 'danger' : 'info';
+        const moeda = item.moeda || 'EUR';
+        const simboloMoeda = { 'EUR': '€', 'USD': '$', 'BRL': 'R$' }[moeda] || '€';
+        
+        return `
+            <tr>
+                <td><strong>${item.sku}</strong></td>
+                <td><span class="badge badge-secondary">#${item.item}</span></td>
+                <td>${item.tipoMolde}<br><small style="color: var(--text-secondary);">${item.traducao}</small></td>
+                <td><span class="badge badge-${classificacaoBadge}">${item.classificacao}</span></td>
+                <td><span class="badge badge-warning">${item.fornecedor || 'N/A'}</span></td>
+                <td><strong>${item.quantidade}</strong> un.</td>
+                <td style="text-align: right;">${simboloMoeda} ${item.valorUnitario.toFixed(2)}</td>
+                <td style="text-align: right;"><strong style="color: #10b981;">${simboloMoeda} ${item.valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="window.app.editCusto('${item.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="window.app.deleteCusto('${item.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    // Atualizar estatísticas e gráfico
+    this.updateCustosStats(items);
+};
+
+AppManager.prototype.updateCustosStats = function(items) {
+    // Popular dropdown de fornecedores
+    const fornecedorFilter = document.getElementById('fornecedorFilter');
+    if (fornecedorFilter) {
+        const fornecedores = [...new Set(items.map(item => item.fornecedor).filter(f => f))];
+        const currentValue = fornecedorFilter.value;
+        
+        fornecedorFilter.innerHTML = '<option value="">Todos os Fornecedores</option>' + 
+            fornecedores.map(f => `<option value="${f}" ${currentValue === f ? 'selected' : ''}>${f}</option>`).join('');
+        
+        // Adicionar evento de mudança se ainda não existe
+        if (!fornecedorFilter.dataset.listenerAdded) {
+            fornecedorFilter.addEventListener('change', () => {
+                this.renderCustos();
+            });
+            fornecedorFilter.dataset.listenerAdded = 'true';
+        }
+        
+        // Filtrar itens pelo fornecedor selecionado
+        if (fornecedorFilter.value) {
+            items = items.filter(item => item.fornecedor === fornecedorFilter.value);
+        }
+    }
+    
+    // Calcular estatísticas (em EUR por padrão)
+    const totalInvestido = items.reduce((sum, item) => sum + item.valorTotal, 0);
+    const custoMedio = items.length > 0 ? totalInvestido / items.length : 0;
+    
+    let moldeBarato = { valorTotal: Infinity, moeda: 'EUR' };
+    let moldeCaro = { valorTotal: 0, moeda: 'EUR' };
+    
+    items.forEach(item => {
+        if (item.valorTotal < moldeBarato.valorTotal) moldeBarato = item;
+        if (item.valorTotal > moldeCaro.valorTotal) moldeCaro = item;
+    });
+    
+    // Símbolo EUR padrão para dashboard
+    const simbolo = '€';
+    
+    // Atualizar cards
+    const totalInvestidoEl = document.getElementById('totalInvestido');
+    const custoMedioEl = document.getElementById('custoMedio');
+    const moldeBaratoEl = document.getElementById('moldeBarato');
+    const moldeCaroEl = document.getElementById('moldeCaro');
+    
+    if (totalInvestidoEl) totalInvestidoEl.textContent = `${simbolo} ${totalInvestido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    if (custoMedioEl) custoMedioEl.textContent = `${simbolo} ${custoMedio.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    if (moldeBaratoEl) moldeBaratoEl.textContent = moldeBarato.valorTotal !== Infinity ? `${simbolo} ${moldeBarato.valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : `${simbolo} 0`;
+    if (moldeCaroEl) moldeCaroEl.textContent = moldeCaro.valorTotal > 0 ? `${simbolo} ${moldeCaro.valorTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` : `${simbolo} 0`;
+    
+    // Criar gráfico
+    this.renderCustosChart(items);
+};
+
+AppManager.prototype.renderCustosChart = function(items) {
+    const canvas = document.getElementById('custosChart');
+    if (!canvas) return;
+    
+    // Destruir gráfico existente
+    if (window.custosChartInstance) {
+        window.custosChartInstance.destroy();
+    }
+    
+    if (items.length === 0) {
+        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+    
+    // Preparar dados (Top 10 mais caros)
+    const sorted = [...items].sort((a, b) => b.valorTotal - a.valorTotal).slice(0, 10);
+    const labels = sorted.map(item => item.traducao);
+    const valores = sorted.map(item => item.valorTotal);
+    const cores = sorted.map(item => item.classificacao === 'MOULD' ? '#ef4444' : '#2563eb');
+    
+    // Criar gráfico
+    window.custosChartInstance = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Valor Total (€)',
+                data: valores,
+                backgroundColor: cores,
+                borderColor: cores,
+                borderWidth: 2,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: 'Top 10 Itens Mais Caros',
+                    font: {
+                        size: 18,
+                        weight: 'bold'
+                    },
+                    color: '#e8e9ed'
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        size: 13
+                    },
+                    callbacks: {
+                        label: function(context) {
+                            return 'Valor Total: € ' + context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '€ ' + value.toLocaleString('pt-BR');
+                        },
+                        font: {
+                            size: 11
+                        },
+                        color: '#8b92ab'
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 11,
+                            weight: 'bold'
+                        },
+                        color: '#8b92ab',
+                        maxRotation: 45,
+                        minRotation: 45
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+};
+
+AppManager.prototype.deleteCusto = function(id) {
+    if (confirm('Tem certeza que deseja excluir este item de custo?')) {
+        this.storage.deleteItem('custos', id);
+        this.notification.show('success', 'Sucesso', 'Item excluído com sucesso!');
+        this.renderCustos();
+    }
+};
+
+AppManager.prototype.editCusto = function(id) {
+    const items = this.storage.getModule('custos');
+    const item = items.find(i => i.id === id);
+    if (item) this.showCustoForm(item);
+};
+
+// Initialize app
+// Inicialização global
+document.addEventListener('DOMContentLoaded', () => {
+    window.app = new AppManager();
+});
+    const formHtml = `
+        <form id="viabilidadeForm" onsubmit="return false;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nome do Projeto *</label>
+                    <input type="text" name="nomeProjeto" value="${item ? item.nomeProjeto : ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Área *</label>
+                    <select name="area" required>
+                        <option value="">Selecione...</option>
+                        <option value="Manutenção" ${item && item.area === 'Manutenção' ? 'selected' : ''}>Manutenção</option>
+                        <option value="Produção" ${item && item.area === 'Produção' ? 'selected' : ''}>Produção</option>
+                        <option value="Qualidade" ${item && item.area === 'Qualidade' ? 'selected' : ''}>Qualidade</option>
+                        <option value="Engenharia" ${item && item.area === 'Engenharia' ? 'selected' : ''}>Engenharia</option>
+                        <option value="Logística" ${item && item.area === 'Logística' ? 'selected' : ''}>Logística</option>
+                        <option value="TI" ${item && item.area === 'TI' ? 'selected' : ''}>TI</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Responsável *</label>
+                    <input type="text" name="responsavel" value="${item ? item.responsavel : ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Data Início *</label>
+                    <input type="date" name="dataInicio" value="${item ? item.dataInicio : ''}" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Descrição *</label>
+                <textarea name="descricao" rows="3" required>${item ? item.descricao : ''}</textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Investimento Inicial (€) *</label>
+                    <input type="number" name="investimentoInicial" step="0.01" min="0" 
+                           value="${item ? item.investimentoInicial : ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Economia Anual (€) *</label>
+                    <input type="number" name="economiaAnual" step="0.01" min="0" 
+                           value="${item ? item.economiaAnual : ''}" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Custo Operacional (€)</label>
+                    <input type="number" name="custoOperacional" step="0.01" min="0" 
+                           value="${item ? item.custoOperacional : 0}">
+                </div>
+                <div class="form-group">
+                    <label>Vida Útil (anos) *</label>
+                    <input type="number" name="vidaUtil" min="1" max="50" 
+                           value="${item ? item.vidaUtil : 5}" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Taxa de Desconto (%) *</label>
+                    <input type="number" name="taxaDesconto" step="0.1" min="0" max="100" 
+                           value="${item ? item.taxaDesconto : 10}" required>
+                </div>
+                <div class="form-group">
+                    <label>Prioridade *</label>
+                    <select name="prioridade" required>
+                        <option value="Alta" ${item && item.prioridade === 'Alta' ? 'selected' : ''}>Alta</option>
+                        <option value="Média" ${item && item.prioridade === 'Média' ? 'selected' : ''}>Média</option>
+                        <option value="Baixa" ${item && item.prioridade === 'Baixa' ? 'selected' : ''}>Baixa</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Benefícios Qualitativos</label>
+                <textarea name="beneficiosQualitativos" rows="2">${item ? item.beneficiosQualitativos || '' : ''}</textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Risco</label>
+                    <select name="risco">
+                        <option value="Baixo" ${item && item.risco === 'Baixo' ? 'selected' : ''}>Baixo</option>
+                        <option value="Médio" ${item && item.risco === 'Médio' ? 'selected' : ''}>Médio</option>
+                        <option value="Alto" ${item && item.risco === 'Alto' ? 'selected' : ''}>Alto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status *</label>
+                    <select name="status" required>
+                        <option value="Pendente" ${item && item.status === 'Pendente' ? 'selected' : ''}>Pendente</option>
+                        <option value="Em Análise" ${item && item.status === 'Em Análise' ? 'selected' : ''}>Em Análise</option>
+                        <option value="Aprovado" ${item && item.status === 'Aprovado' ? 'selected' : ''}>Aprovado</option>
+                        <option value="Rejeitado" ${item && item.status === 'Rejeitado' ? 'selected' : ''}>Rejeitado</option>
+                        <option value="Em Execução" ${item && item.status === 'Em Execução' ? 'selected' : ''}>Em Execução</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    `;
+    
+    const self = this;
+    this.modal.show(
+        item ? 'Editar Projeto' : 'Novo Projeto',
+        formHtml,
+        function() {
+            const form = document.getElementById('viabilidadeForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return false;
+            }
+            
+            const formData = new FormData(form);
+            const data = {};
+            formData.forEach((value, key) => {
+                data[key] = value;
+            });
+            
+            // Converter números
+            data.investimentoInicial = parseFloat(data.investimentoInicial);
+            data.economiaAnual = parseFloat(data.economiaAnual);
+            data.custoOperacional = parseFloat(data.custoOperacional) || 0;
+            data.vidaUtil = parseInt(data.vidaUtil);
+            data.taxaDesconto = parseFloat(data.taxaDesconto);
+            
+            // Calcular métricas
+            const metricas = self.calcularMetricas(data);
+            Object.assign(data, metricas);
+            
+            if (item) {
+                // Editar
+                data.id = item.id;
+                data.createdAt = item.createdAt;
+                const index = self.data.viabilidade.findIndex(p => p.id === item.id);
+                self.data.viabilidade[index] = data;
+                self.notification.show('Projeto atualizado!', 'success');
+            } else {
+                // Adicionar novo
+                data.id = self.generateId();
+                data.createdAt = new Date().toISOString();
+                self.data.viabilidade.push(data);
+                self.notification.show('Projeto adicionado!', 'success');
+            }
+            
+            self.saveData(self.data);
+            self.renderViabilidade();
+            return true;
+        }
+    );
+};
+
+// Calcular métricas financeiras
+AppManager.prototype.calcularMetricas = function(projeto) {
+    const inv = projeto.investimentoInicial;
+    const eco = projeto.economiaAnual;
+    const custo = projeto.custoOperacional;
+    const vida = projeto.vidaUtil;
+    const taxa = projeto.taxaDesconto / 100;
+    
+    const fluxoAnual = eco - custo;
+    
+    // ROI
+    const roi = ((eco * vida - inv) / inv * 100).toFixed(2);
+    
+    // Payback
+    const payback = fluxoAnual > 0 ? (inv / fluxoAnual).toFixed(2) : 'N/A';
+    
+    // VPL
+    let vpl = -inv;
+    for (let ano = 1; ano <= vida; ano++) {
+        vpl += fluxoAnual / Math.pow(1 + taxa, ano);
+    }
+    vpl = parseFloat(vpl.toFixed(2));
+    
+    // TIR (aproximação)
+    let tir = 0.1;
+    for (let i = 0; i < 20; i++) {
+        let f = -inv;
+        let df = 0;
+        for (let ano = 1; ano <= vida; ano++) {
+            f += fluxoAnual / Math.pow(1 + tir, ano);
+            df -= ano * fluxoAnual / Math.pow(1 + tir, ano + 1);
+        }
+        if (Math.abs(f) < 0.01) break;
+        tir = tir - f / df;
+    }
+    const tirPercent = (tir * 100).toFixed(2);
+    
+    return {
+        roi: parseFloat(roi),
+        payback: payback === 'N/A' ? payback : parseFloat(payback),
+        vpl: vpl,
+        tir: tirPercent
+    };
+};
+
+// Renderizar lista de projetos
+AppManager.prototype.renderViabilidade = function() {
+    const projetos = this.data.viabilidade || [];
+    const tbody = document.getElementById('viabilidadeTable');
+    
+    if (projetos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-message">Nenhum projeto cadastrado</td></tr>';
+        this.updateViabilidadeStats([]);
+        return;
+    }
+    
+    tbody.innerHTML = projetos.map(p => {
+        const roiClass = p.roi > 50 ? 'success' : p.roi > 20 ? 'warning' : 'danger';
+        const statusClass = p.status === 'Aprovado' ? 'success' : 
+                          p.status === 'Rejeitado' ? 'danger' : 
+                          p.status === 'Em Execução' ? 'info' : 'warning';
+        
+        return `
+            <tr>
+                <td><strong>${p.nomeProjeto}</strong></td>
+                <td>${p.area}</td>
+                <td>€ ${p.investimentoInicial.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td>€ ${p.economiaAnual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td><span class="badge badge-${roiClass}">${p.roi}%</span></td>
+                <td>${p.payback} anos</td>
+                <td style="color: ${p.vpl > 0 ? 'var(--success-color)' : 'var(--danger-color)'};">
+                    € ${p.vpl.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </td>
+                <td><span class="badge badge-${statusClass}">${p.status}</span></td>
+                <td class="actions">
+                    <button class="btn-icon btn-edit" onclick="app.editViabilidade('${p.id}')" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-delete" onclick="app.deleteViabilidade('${p.id}')" title="Excluir">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    this.updateViabilidadeStats(projetos);
+};
+
+// Atualizar estatísticas
+AppManager.prototype.updateViabilidadeStats = function(projetos) {
+    const total = projetos.length;
+    const aprovados = projetos.filter(p => p.status === 'Aprovado').length;
+    const pendentes = projetos.filter(p => p.status === 'Pendente' || p.status === 'Em Análise').length;
+    const investTotal = projetos.reduce((sum, p) => sum + p.investimentoInicial, 0);
+    
+    document.getElementById('totalProjetos').textContent = total;
+    document.getElementById('projetosAprovados').textContent = aprovados;
+    document.getElementById('projetosPendentes').textContent = pendentes;
+    document.getElementById('investimentoTotal').textContent = 
+        '€ ' + investTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+    
+    this.renderViabilidadeCharts(projetos);
+};
+
+// Renderizar gráficos
+AppManager.prototype.renderViabilidadeCharts = function(projetos) {
+    if (projetos.length === 0) return;
+    
+    // Top 5 ROI
+    const topRoi = [...projetos].sort((a, b) => b.roi - a.roi).slice(0, 5);
+    const roiCanvas = document.getElementById('roiChart');
+    
+    if (this.roiChart) this.roiChart.destroy();
+    
+    this.roiChart = new Chart(roiCanvas, {
+        type: 'bar',
+        data: {
+            labels: topRoi.map(p => p.nomeProjeto),
+            datasets: [{
+                label: 'ROI (%)',
+                data: topRoi.map(p => p.roi),
+                backgroundColor: topRoi.map(p => 
+                    p.roi > 50 ? 'rgba(16, 185, 129, 0.8)' : 
+                    p.roi > 20 ? 'rgba(245, 158, 11, 0.8)' : 
+                    'rgba(239, 68, 68, 0.8)'
+                ),
+                borderColor: topRoi.map(p => 
+                    p.roi > 50 ? 'rgba(16, 185, 129, 1)' : 
+                    p.roi > 20 ? 'rgba(245, 158, 11, 1)' : 
+                    'rgba(239, 68, 68, 1)'
+                ),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(22, 27, 46, 0.95)',
+                    titleColor: '#e8e9ed',
+                    bodyColor: '#8b92ab'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#8b92ab' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
+                x: {
+                    ticks: { color: '#8b92ab' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                }
+            }
+        }
+    });
+    
+    // Top 5 Payback
+    const topPayback = [...projetos]
+        .filter(p => p.payback !== 'N/A')
+        .sort((a, b) => a.payback - b.payback)
+        .slice(0, 5);
+    
+    const paybackCanvas = document.getElementById('paybackChart');
+    
+    if (this.paybackChart) this.paybackChart.destroy();
+    
+    this.paybackChart = new Chart(paybackCanvas, {
+        type: 'bar',
+        data: {
+            labels: topPayback.map(p => p.nomeProjeto),
+            datasets: [{
+                label: 'Payback (anos)',
+                data: topPayback.map(p => p.payback),
+                backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                borderColor: 'rgba(59, 130, 246, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(22, 27, 46, 0.95)',
+                    titleColor: '#e8e9ed',
+                    bodyColor: '#8b92ab'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#8b92ab' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
+                x: {
+                    ticks: { color: '#8b92ab' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                }
+            }
+        }
+    });
+};
+
+// Excluir projeto
+AppManager.prototype.deleteViabilidade = function(id) {
+    if (!confirm('Tem certeza que deseja excluir este projeto?')) return;
+    
+    this.data.viabilidade = this.data.viabilidade.filter(p => p.id !== id);
+    this.saveData(this.data);
+    this.notification.show('Projeto excluído!', 'success');
+    this.renderViabilidade();
+};
+
+// Editar projeto
+AppManager.prototype.editViabilidade = function(id) {
+    const projeto = this.data.viabilidade.find(p => p.id === id);
+    if (projeto) {
+        this.showViabilidadeForm(projeto);
+    }
+};
+
+// Initialize app
+// Inicialização global
+document.addEventListener('DOMContentLoaded', () => {
+    window.app = new AppManager();
+});
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Nome do Projeto *</label>
+                    <input type="text" name="nomeProjeto" value="${item && item.nomeProjeto || ''}" required 
+                           placeholder="Ex: Automação Linha 3">
+                </div>
+                <div class="form-group">
+                    <label>Área *</label>
+                    <select name="area" required>
+                        <option value="">Selecione...</option>
+                        <option value="Manutenção" ${item && item.area === 'Manutenção' ? 'selected' : ''}>Manutenção</option>
+                        <option value="Produção" ${item && item.area === 'Produção' ? 'selected' : ''}>Produção</option>
+                        <option value="Qualidade" ${item && item.area === 'Qualidade' ? 'selected' : ''}>Qualidade</option>
+                        <option value="Engenharia" ${item && item.area === 'Engenharia' ? 'selected' : ''}>Engenharia</option>
+                        <option value="Logística" ${item && item.area === 'Logística' ? 'selected' : ''}>Logística</option>
+                        <option value="TI" ${item && item.area === 'TI' ? 'selected' : ''}>TI</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Responsável *</label>
+                    <input type="text" name="responsavel" value="${item && item.responsavel || ''}" required 
+                           placeholder="Ex: João Silva">
+                </div>
+                <div class="form-group">
+                    <label>Data Início *</label>
+                    <input type="date" name="dataInicio" value="${item && item.dataInicio || ''}" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Descrição do Projeto *</label>
+                <textarea name="descricao" rows="3" required placeholder="Descreva o projeto de forma clara e objetiva...">${item && item.descricao || ''}</textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Investimento Inicial (€) *</label>
+                    <input type="number" name="investimentoInicial" step="0.01" min="0" 
+                           value="${item && item.investimentoInicial || ''}" required 
+                           placeholder="Ex: 50000">
+                </div>
+                <div class="form-group">
+                    <label>Economia Anual (€) *</label>
+                    <input type="number" name="economiaAnual" step="0.01" min="0" 
+                           value="${item && item.economiaAnual || ''}" required 
+                           placeholder="Ex: 20000">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Custo Operacional Anual (€)</label>
+                    <input type="number" name="custoOperacional" step="0.01" min="0" 
+                           value="${item && item.custoOperacional || 0}" 
+                           placeholder="Ex: 5000">
+                </div>
+                <div class="form-group">
+                    <label>Vida Útil (anos) *</label>
+                    <input type="number" name="vidaUtil" min="1" max="50" 
+                           value="${item && item.vidaUtil || 5}" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Taxa de Desconto (%) *</label>
+                    <input type="number" name="taxaDesconto" step="0.1" min="0" max="100" 
+                           value="${item && item.taxaDesconto || 10}" required 
+                           placeholder="Ex: 10">
+                    <small style="color: var(--text-secondary);">Taxa mínima de atratividade (TMA)</small>
+                </div>
+                <div class="form-group">
+                    <label>Prioridade *</label>
+                    <select name="prioridade" required>
+                        <option value="Alta" ${item && item.prioridade === 'Alta' ? 'selected' : ''}>Alta</option>
+                        <option value="Média" ${item && item.prioridade === 'Média' ? 'selected' : ''}>Média</option>
+                        <option value="Baixa" ${item && item.prioridade === 'Baixa' ? 'selected' : ''}>Baixa</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Benefícios Qualitativos</label>
+                <textarea name="beneficiosQualitativos" rows="2" 
+                          placeholder="Ex: Melhoria na segurança, redução de retrabalho...">${item && item.beneficiosQualitativos || ''}</textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Análise de Risco</label>
+                    <select name="risco">
+                        <option value="Baixo" ${item && item.risco === 'Baixo' ? 'selected' : ''}>Baixo</option>
+                        <option value="Médio" ${item && item.risco === 'Médio' ? 'selected' : ''}>Médio</option>
+                        <option value="Alto" ${item && item.risco === 'Alto' ? 'selected' : ''}>Alto</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status *</label>
+                    <select name="status" required>
+                        <option value="Pendente" ${item && item.status === 'Pendente' ? 'selected' : ''}>Pendente</option>
+                        <option value="Em Análise" ${item && item.status === 'Em Análise' ? 'selected' : ''}>Em Análise</option>
+                        <option value="Aprovado" ${item && item.status === 'Aprovado' ? 'selected' : ''}>Aprovado</option>
+                        <option value="Rejeitado" ${item && item.status === 'Rejeitado' ? 'selected' : ''}>Rejeitado</option>
+                        <option value="Em Execução" ${item && item.status === 'Em Execução' ? 'selected' : ''}>Em Execução</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary-color); padding: 15px; border-radius: 8px; margin-top: 20px;">
+                <h4 style="color: var(--primary-color); margin-bottom: 10px; font-size: 14px;">
+                    <i class="fas fa-calculator"></i> Métricas Calculadas Automaticamente:
+                </h4>
+                <ul style="color: var(--text-secondary); font-size: 13px; margin-left: 20px;">
+                    <li><strong>ROI</strong> = (Economia Anual × Vida Útil - Investimento) / Investimento × 100</li>
+                    <li><strong>Payback</strong> = Investimento / (Economia Anual - Custo Operacional)</li>
+                    <li><strong>VPL</strong> = Valor Presente Líquido dos fluxos de caixa futuros</li>
+                    <li><strong>TIR</strong> = Taxa Interna de Retorno do projeto</li>
+                </ul>
+            </div>
+        </form>
+    `;
+    
+    this.modal.show(item ? 'Editar Projeto' : 'Adicionar Novo Projeto', content, () => {
+        const form = document.getElementById('viabilidadeForm');
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return false;
+        }
+        
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        // Converter valores numéricos
+        data.investimentoInicial = parseFloat(data.investimentoInicial);
+        data.economiaAnual = parseFloat(data.economiaAnual);
+        data.custoOperacional = parseFloat(data.custoOperacional) || 0;
+        data.vidaUtil = parseInt(data.vidaUtil);
+        data.taxaDesconto = parseFloat(data.taxaDesconto);
+        
+        // Calcular métricas financeiras
+        const metricas = this.calcularMetricasFinanceiras(data);
+        Object.assign(data, metricas);
+        
+        if (item) {
+            data.id = item.id;
+            data.createdAt = item.createdAt;
+            const index = this.data.viabilidade.findIndex(p => p.id === item.id);
+            this.data.viabilidade[index] = data;
+            this.notification.show('Projeto atualizado com sucesso!', 'success');
+        } else {
+            data.id = this.generateId();
+            data.createdAt = new Date().toISOString();
+            this.data.viabilidade.push(data);
+            this.notification.show('Projeto adicionado com sucesso!', 'success');
+        }
+        
+        this.saveData(this.data);
+        this.renderViabilidade();
+        return true;
+    });
+};
+
+// Cálculo de métricas financeiras
+AppManager.prototype.calcularMetricasFinanceiras = function(projeto) {
+    const { investimentoInicial, economiaAnual, custoOperacional, vidaUtil, taxaDesconto } = projeto;
+    const fluxoCaixaAnual = economiaAnual - custoOperacional;
+    
+    // ROI (Return on Investment)
+    const roi = ((economiaAnual * vidaUtil - investimentoInicial) / investimentoInicial * 100).toFixed(2);
+    
+    // Payback simples
+    const payback = fluxoCaixaAnual > 0 ? (investimentoInicial / fluxoCaixaAnual).toFixed(2) : 'N/A';
+    
+    // VPL (Valor Presente Líquido)
+    let vpl = -investimentoInicial;
+    const taxa = taxaDesconto / 100;
+    for (let ano = 1; ano <= vidaUtil; ano++) {
+        vpl += fluxoCaixaAnual / Math.pow(1 + taxa, ano);
+    }
+    
+    // TIR (Taxa Interna de Retorno) - Aproximação por Newton-Raphson
+    let tir = 0.1; // Chute inicial 10%
+    for (let i = 0; i < 20; i++) {
+        let f = -investimentoInicial;
+        let df = 0;
+        for (let ano = 1; ano <= vidaUtil; ano++) {
+            f += fluxoCaixaAnual / Math.pow(1 + tir, ano);
+            df -= ano * fluxoCaixaAnual / Math.pow(1 + tir, ano + 1);
+        }
+        if (Math.abs(f) < 0.01) break;
+        tir = tir - f / df;
+    }
+    
+    return {
+        roi: parseFloat(roi),
+        payback: payback === 'N/A' ? payback : parseFloat(payback),
+        vpl: parseFloat(vpl.toFixed(2)),
+        tir: (tir * 100).toFixed(2)
+    };
+};
+
+AppManager.prototype.renderViabilidade = function() {
+    const projetos = this.data.viabilidade || [];
+    const tbody = document.getElementById('viabilidadeTable');
+    
+    if (projetos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-message">Nenhum projeto cadastrado</td></tr>';
+        this.updateViabilidadeStats([]);
+        return;
+    }
+    
+    tbody.innerHTML = projetos.map(p => {
+        const roiClass = p.roi > 50 ? 'success' : p.roi > 20 ? 'warning' : 'danger';
+        const statusClass = p.status === 'Aprovado' ? 'success' : 
+                          p.status === 'Rejeitado' ? 'danger' : 
+                          p.status === 'Em Execução' ? 'info' : 'warning';
+        
+        return `
+            <tr>
+                <td><strong>${p.nomeProjeto}</strong></td>
+                <td>${p.area}</td>
+                <td>€ ${p.investimentoInicial.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td>€ ${p.economiaAnual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                <td><span class="badge badge-${roiClass}">${p.roi}%</span></td>
+                <td>${p.payback} anos</td>
+                <td style="color: ${p.vpl > 0 ? 'var(--success-color)' : 'var(--danger-color)'};">
+                    € ${p.vpl.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </td>
+                <td><span class="badge badge-${statusClass}">${p.status}</span></td>
+                <td class="actions">
+                    <button class="btn-icon btn-edit" onclick="app.editViabilidade('${p.id}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-delete" onclick="app.deleteViabilidade('${p.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    this.updateViabilidadeStats(projetos);
+};
+
+AppManager.prototype.updateViabilidadeStats = function(projetos) {
+    const total = projetos.length;
+    const aprovados = projetos.filter(p => p.status === 'Aprovado').length;
+    const pendentes = projetos.filter(p => p.status === 'Pendente' || p.status === 'Em Análise').length;
+    const investimentoTotal = projetos.reduce((sum, p) => sum + p.investimentoInicial, 0);
+    
+    document.getElementById('totalProjetos').textContent = total;
+    document.getElementById('projetosAprovados').textContent = aprovados;
+    document.getElementById('projetosPendentes').textContent = pendentes;
+    document.getElementById('investimentoTotal').textContent = 
+        '€ ' + investimentoTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+    
+    this.renderViabilidadeCharts(projetos);
+};
+
+AppManager.prototype.renderViabilidadeCharts = function(projetos) {
+    if (projetos.length === 0) return;
+    
+    // Top 5 projetos por ROI
+    const topRoi = [...projetos]
+        .sort((a, b) => b.roi - a.roi)
+        .slice(0, 5);
+    
+    // Gráfico ROI
+    const roiCanvas = document.getElementById('roiChart');
+    if (this.roiChart) this.roiChart.destroy();
+    
+    this.roiChart = new Chart(roiCanvas, {
+        type: 'bar',
+        data: {
+            labels: topRoi.map(p => p.nomeProjeto),
+            datasets: [{
+                label: 'ROI (%)',
+                data: topRoi.map(p => p.roi),
+                backgroundColor: topRoi.map(p => 
+                    p.roi > 50 ? 'rgba(16, 185, 129, 0.8)' : 
+                    p.roi > 20 ? 'rgba(245, 158, 11, 0.8)' : 
+                    'rgba(239, 68, 68, 0.8)'
+                ),
+                borderColor: topRoi.map(p => 
+                    p.roi > 50 ? 'rgba(16, 185, 129, 1)' : 
+                    p.roi > 20 ? 'rgba(245, 158, 11, 1)' : 
+                    'rgba(239, 68, 68, 1)'
+                ),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(22, 27, 46, 0.95)',
+                    titleColor: '#e8e9ed',
+                    bodyColor: '#8b92ab',
+                    callbacks: {
+                        label: (context) => `ROI: ${context.parsed.y}%`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#8b92ab',
+                        callback: (value) => value + '%'
+                    },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
+                x: {
+                    ticks: { color: '#8b92ab' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                }
+            }
+        }
+    });
+    
+    // Top 5 projetos por Payback
+    const topPayback = [...projetos]
+        .filter(p => p.payback !== 'N/A')
+        .sort((a, b) => a.payback - b.payback)
+        .slice(0, 5);
+    
+    // Gráfico Payback
+    const paybackCanvas = document.getElementById('paybackChart');
+    if (this.paybackChart) this.paybackChart.destroy();
+    
+    this.paybackChart = new Chart(paybackCanvas, {
+        type: 'bar',
+        data: {
+            labels: topPayback.map(p => p.nomeProjeto),
+            datasets: [{
+                label: 'Payback (anos)',
+                data: topPayback.map(p => p.payback),
+                backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                borderColor: 'rgba(59, 130, 246, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(22, 27, 46, 0.95)',
+                    titleColor: '#e8e9ed',
+                    bodyColor: '#8b92ab',
+                    callbacks: {
+                        label: (context) => `Payback: ${context.parsed.y} anos`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#8b92ab',
+                        callback: (value) => value + ' anos'
+                    },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
+                x: {
+                    ticks: { color: '#8b92ab' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                }
+            }
+        }
+    });
+};
+
+AppManager.prototype.deleteViabilidade = function(id) {
+    if (!confirm('Tem certeza que deseja excluir este projeto?')) return;
+    
+    this.data.viabilidade = this.data.viabilidade.filter(p => p.id !== id);
+    this.saveData(this.data);
+    this.notification.show('Projeto excluído com sucesso!', 'success');
+    this.renderViabilidade();
+};
+
+AppManager.prototype.editViabilidade = function(id) {
+    const projeto = this.data.viabilidade.find(p => p.id === id);
+    if (projeto) this.showViabilidadeForm(projeto);
+};
+
+// Initialize app
+// Inicialização global
+document.addEventListener('DOMContentLoaded', () => {
+    window.app = new AppManager();
+});
